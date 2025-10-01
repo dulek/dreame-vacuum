@@ -292,15 +292,44 @@ class DreameVacuumDataUpdateCoordinator(DataUpdateCoordinator[DreameVacuumDevice
                     if NOTIFICATION_ID_CONSUMABLE not in self._notify:
                         return
 
+            notification_id = f"{DOMAIN}_{self.device.mac}_{notification_id}"
             persistent_notification.create(
                 self.hass,
                 content,
                 title=self.device.name,
-                notification_id=f"{DOMAIN}_{self.device.mac}_{notification_id}",
+                notification_id=notification_id,
+            )
+
+            # HACK(dulek): Just remove the image for now.
+            content = content.split("![image]")[0].strip()
+            self.haas.services.call(
+                "notify",
+                "mobile_app_pixel_7a",
+                {
+                    "title": self.device.name,
+                    "message": content,
+                    "data": {
+                        "tag": notification_id,
+                        "image": "/media/local/filter.png",
+                        "notification_icon": "mdi:robot-vacuum",
+                    },
+                },
             )
 
     def _remove_persistent_notification(self, notification_id) -> None:
-        persistent_notification.dismiss(self.hass, f"{DOMAIN}_{self.device.mac}_{notification_id}")
+        notification_id = f"{DOMAIN}_{self.device.mac}_{notification_id}"
+        persistent_notification.dismiss(self.hass, notification_id)
+
+        self.haas.services.call(
+            "notify",
+            "mobile_app_pixel_7a",
+            {
+                "message": "clear_notification",
+                "data": {
+                    "tag": notification_id,
+                },
+            },
+        )
 
     def _notification_dismiss_listener(self, type, data) -> None:
         if type == persistent_notification.UpdateType.REMOVED and self.device:
