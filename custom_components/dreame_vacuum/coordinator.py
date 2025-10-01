@@ -128,7 +128,7 @@ class DreameVacuumDataUpdateCoordinator(DataUpdateCoordinator[DreameVacuumDevice
 
         if entry.options.get(CONF_VERSION) != VERSION:
             options = entry.options.copy()
-            
+
             ## Migration: Convert map objects to hidden map objects
             if CONF_MAP_OBJECTS in entry.options and CONF_HIDDEN_MAP_OBJECTS not in options:
                 options[CONF_HIDDEN_MAP_OBJECTS] = []
@@ -438,15 +438,43 @@ class DreameVacuumDataUpdateCoordinator(DataUpdateCoordinator[DreameVacuumDevice
                     if NOTIFICATION_ID_CONSUMABLE not in self._notify:
                         return
 
+            notification_id = f"{DOMAIN}_{self._device.mac}_{notification_id}"
             persistent_notification.create(
                 hass=self.hass,
                 message=content,
                 title=self._device.name,
                 notification_id=f"{DOMAIN}_{self._device.mac}_{notification_id}",
+
+            # HACK(dulek): Just remove the image for now.
+            content = content.split("![image]")[0].strip()
+            self.haas.services.call(
+                "notify",
+                "mobile_app_pixel_7a",
+                {
+                    "title": self.device.name,
+                    "message": content,
+                    "data": {
+                        "tag": notification_id,
+                        "image": "/local/dreame_vacuum/filter.png",
+                        "notification_icon": "mdi:robot-vacuum",
+                    },
+                },
             )
 
     def _remove_persistent_notification(self, notification_id) -> None:
-        persistent_notification.dismiss(self.hass, f"{DOMAIN}_{self._device.mac}_{notification_id}")
+        notification_id = f"{DOMAIN}_{self._device.mac}_{notification_id}"
+        persistent_notification.dismiss(self.hass, notification_id)
+
+        self.haas.services.call(
+            "notify",
+            "mobile_app_pixel_7a",
+            {
+                "message": "clear_notification",
+                "data": {
+                    "tag": notification_id,
+                },
+            },
+        )
 
     def _notification_dismiss_listener(self, type, data) -> None:
         if type == persistent_notification.UpdateType.REMOVED and self._device:
